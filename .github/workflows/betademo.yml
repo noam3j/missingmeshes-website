@@ -1,0 +1,54 @@
+name: Missing Meshes Beta Deployment
+
+concurrency: betademo
+
+on:
+  push:
+    branches: [ beta ]
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    environment: betademo
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          **/node_modules
+        key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+    - name: Install dependencies
+      run: npm install
+
+    # - name: Run the tests and generate coverage report
+    #   run: npm test -- --coverage
+
+    # - name: Upload coverage to Codecov
+    #   uses: codecov/codecov-action@v1
+
+    - name: Build
+      run: npm run build
+
+    - name: S3 Sync
+      uses: jakejarvis/s3-sync-action@v0.5.1     
+      with:
+        args: --acl public-read --follow-symlinks --delete
+      env:
+        AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: 'us-east-1'   # optional: defaults to us-east-1
+        SOURCE_DIR: '.next'      # optional: defaults to entire repository
